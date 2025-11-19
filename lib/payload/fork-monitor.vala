@@ -61,21 +61,27 @@ namespace Frida {
 					string cmdline;
 					FileUtils.get_contents ("/proc/self/cmdline", out cmdline);
 					if (cmdline == "zygote" || cmdline == "zygote64" || cmdline == "usap32" || cmdline == "usap64") {
+						var set_argv0 = (void *) null;
 						var runtime = Gum.Process.find_module_by_name ("libandroid_runtime.so");
 						if (runtime != null) {
-							var set_argv0 = (void *) runtime.find_export_by_name ("_Z27android_os_Process_setArgV0P7_JNIEnvP8_jobjectP8_jstring");
-							if (set_argv0 != null) {
-								interceptor.attach (set_argv0, listener, (void *) HookId.SET_ARGV0);
-								child_recovery_behavior = DEFERRED_UNTIL_SET_ARGV0;
-							}
+							set_argv0 = (void *) runtime.find_export_by_name ("_Z27android_os_Process_setArgV0P7_JNIEnvP8_jobjectP8_jstring");
+						}
+						if (set_argv0 == null) {
+							set_argv0 = (void *) Gum.Module.find_global_export_by_name ("_Z27android_os_Process_setArgV0P7_JNIEnvP8_jobjectP8_jstring");
+						}
+						if (set_argv0 != null) {
+							interceptor.attach (set_argv0, listener, (void *) HookId.SET_ARGV0);
+							child_recovery_behavior = DEFERRED_UNTIL_SET_ARGV0;
 						}
 
+						var setcontext = (void *) null;
 						var selinux = Gum.Process.find_module_by_name ("libselinux.so");
-						if (selinux != null) {
-							var setcontext = (void *) selinux.find_export_by_name ("selinux_android_setcontext");
-							if (setcontext != null)
-								interceptor.attach (setcontext, listener, (void *) HookId.SET_CTX);
-						}
+						if (selinux != null)
+							setcontext = (void *) selinux.find_export_by_name ("selinux_android_setcontext");
+						if (selinux == null)
+							setcontext = (void *) Gum.Module.find_global_export_by_name ("selinux_android_setcontext");
+						if (setcontext != null)
+							interceptor.attach (setcontext, listener, (void *) HookId.SET_CTX);
 					}
 				} catch (FileError e) {
 				}
